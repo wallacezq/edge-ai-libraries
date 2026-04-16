@@ -8,6 +8,10 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+       http_proxy: ${http_proxy}
+       https_proxy: ${https_proxy}
+       no_proxy: ${no_proxy}
     ports:
       - "${VLM_SERVICE_PORT}:8000"
     ipc: host
@@ -30,6 +34,8 @@ services:
       VLM_TELEMETRY_PATH: ${VLM_TELEMETRY_PATH:-/opt/vlm_telemetry.jsonl}
       VLM_TELEMETRY_MAX_RECORDS: ${VLM_TELEMETRY_MAX_RECORDS:-100}
     restart: unless-stopped
+    user: "${UID:-1000}:${GID:-1000}"
+    privileged: true
     devices:
       - /dev/dri:/dev/dri
     group_add:
