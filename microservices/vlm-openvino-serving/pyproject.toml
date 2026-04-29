@@ -12,7 +12,7 @@ package-mode = false
 [tool.poetry.dependencies]
 python = "^3.10,<3.14"
 torch = { version = "==2.8.0", source = "pytorch-cpu" }
-torchvision = { version = "==0.23.0", source = "pytorch-cpu" }
+#torchvision = { url = "https://github.com/pytorch/vision/archive/refs/tags/v0.23.0.tar.gz" }
 fastapi = "^0.124.2"
 fastapi-utils = "^0.8.0"
 typing-inspect = "^0.9.0"
@@ -35,6 +35,7 @@ protobuf = "^6.33.5"
 filelock = "^3.20.3"
 setuptools = "^82.0.1"
 wheel = "^0.46.3"
+torchvision = { version = "==0.23.0", source = "pytorch-cpu" }
 
 [[tool.poetry.source]]
 name = "pytorch-cpu"

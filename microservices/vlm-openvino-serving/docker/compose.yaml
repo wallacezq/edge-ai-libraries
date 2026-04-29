@@ -2,6 +2,22 @@
 # SPDX-License-Identifier: Apache-2.0
 
 services:
+  http-serving:
+    image: ${REGISTRY:-}vlm-openvino-serving:${TAG:-latest}
+    container_name: http-serving
+    ports:
+     - 9000:8000
+    command: python -m http.server
+    user: "${UID:-1000}:${GID:-1000}"
+    group_add:
+      - ${USER_GROUP_ID:-1000}
+      - ${VIDEO_GROUP_ID:-44}
+      - ${RENDER_GROUP_ID:-1002}
+    networks:
+      - my_network
+    volumes:
+      - /home/hec/edge-ai-libraries/microservices/vlm-openvino-serving:/app
+
   vlm-openvino-serving:
     image: ${REGISTRY:-}vlm-openvino-serving:${TAG:-latest}
     container_name: vlm-openvino-serving
@@ -36,8 +52,8 @@ services:
     restart: unless-stopped
     user: "${UID:-1000}:${GID:-1000}"
     privileged: true
-    devices:
-      - /dev/dri:/dev/dri
+    #devices:
+    #  - /dev/dri:/dev/dri
     group_add:
       - ${USER_GROUP_ID:-1000} 
       - ${VIDEO_GROUP_ID:-44}    
@@ -53,6 +69,7 @@ services:
     volumes:
       - ov-models:/home/appuser/.cache/huggingface
       - ov-models:/app/ov-model
+      - /dev/dri:/dev/dri:rw 
 volumes:
   ov-models:
     external: true

@@ -23,7 +23,13 @@ RUN groupadd -g ${USER_GROUP_ID} appuser && useradd -m -s /bin/bash -u ${USER_ID
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends --fix-missing \
     curl \
+    libpng16-16t64 libpng-dev ffmpeg libjpeg-dev \
+    libavcodec-dev libavdevice-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev git \ 
     && rm -rf /var/lib/apt/lists/* 
+
+#RUN ln -s /usr/lib/x86_64-linux-gnu/libjpeg.so.62 /usr/lib/x86_64-linux-gnu/libjpeg.so.8
+RUN curl http://archive.debian.org/debian/pool/main/libj/libjpeg8/libjpeg8_8b-1_amd64.deb -o /tmp/libjpeg8_8b-1_amd64.deb && \
+    apt-get install -y --no-install-recommends --fix-missing /tmp/libjpeg8_8b-1_amd64.deb && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=build /usr/local/bin /usr/local/bin
@@ -36,7 +42,7 @@ RUN /tmp/install_gpu_drivers.sh
 RUN apt-get clean && rm -rf /tmp/install_gpu_drivers.sh && rm -rf /var/lib/apt/lists/* && rm -rf /tmp/* && rm -rf /root/.cachetmp/*
 
 # Optionally download copyleft sources if requested
-ARG COPYLEFT_SOURCES=false
+ARG COPYLEFT_SOURCES=true
 RUN if [ "$COPYLEFT_SOURCES" = "true" ]; then \
         apt-get update && \
         # Get list of installed deb packages with copyleft licenses \
@@ -65,11 +71,32 @@ RUN if [ "$COPYLEFT_SOURCES" = "true" ]; then \
                 pip3 download --no-binary :all: $pkg || true; \
             fi; \
         done; \
-        apt-get remove --purge -y gcc build-essential libffi-dev python3-dev; \
+        # apt-get remove --purge -y gcc build-essential libffi-dev python3-dev; \
     fi
     
 WORKDIR /app
 COPY . .
+
+#RUN pip install -U /app/torchvision-0.23.0a0+824e8c8-cp312-cp312-linux_x86_64.whl
+#RUN git clone --branch v0.23.0 https://github.com/pytorch/vision.git && \
+#   cd vision 
+
+RUN export BUILD_VIDEO_READER=1\
+    export BUILD_TORCHVISION_OPS=0\
+    export FORCE_CUDA=0\
+    export NO_CUDA=1
+
+RUN pip install "setuptools<82"
+
+RUN git clone --branch v0.23.0 https://github.com/pytorch/vision.git && \
+    cd vision && \
+    python setup.py build_ext --inplace
+RUN cp /app/vision/torchvision/video_reader.so /usr/local/lib && \
+    cp /app/vision/torchvision/video_reader.so /usr/local/lib/python3.12/site-packages/torchvision/
+
+RUN rm -rf vision
+RUN apt-get remove --purge -y gcc build-essential libffi-dev python3-dev
+
 RUN chmod +x /app/scripts/compress_model.sh
 
 RUN mkdir -p /home/appuser/.cache/huggingface /app/ov-model && \
