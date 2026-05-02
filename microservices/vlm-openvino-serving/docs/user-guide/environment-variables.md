@@ -248,6 +248,52 @@ export VLM_TELEMETRY_MAX_RECORDS=500
 
 ### Service Configuration
 
+#### VLM_CONTINUOUS_BATCHING
+
+**Description**: Enables the inference scheduler that supports concurrent requests via continuous batching. When the underlying pipeline supports `add_request()`/`step()` (openvino-genai ≥ 2025.4), requests are batched natively. Otherwise, requests are serialized automatically to prevent the "Generate cannot be called while ContinuousBatchingPipeline is already in running state" error.
+
+**Default**: `true`
+
+**Supported Values**: `true`, `false`
+
+**Examples**:
+
+```bash
+# Enable continuous batching (default)
+export VLM_CONTINUOUS_BATCHING=true
+
+# Disable scheduler and use direct pipeline calls (legacy behavior)
+export VLM_CONTINUOUS_BATCHING=false
+```
+
+**Notes**:
+
+- When enabled, multiple concurrent `/v1/chat/completions` requests are queued and processed by the scheduler without errors.
+- The scheduler is not used for SmolVLM models which use a different inference path (HuggingFace Optimum).
+- Disable this if you experience compatibility issues with custom pipeline configurations.
+
+#### VLM_SCHEDULER_MAX_QUEUE
+
+**Description**: Maximum number of pending inference requests the scheduler will hold before rejecting new requests.
+
+**Default**: `64`
+
+**Examples**:
+
+```bash
+# Allow up to 128 queued requests
+export VLM_SCHEDULER_MAX_QUEUE=128
+
+# Restrict queue for latency-sensitive deployments
+export VLM_SCHEDULER_MAX_QUEUE=8
+```
+
+**Notes**:
+
+- Only applies when `VLM_CONTINUOUS_BATCHING=true`.
+- Higher values allow more concurrent clients but increase memory pressure.
+- Requests that exceed the queue limit will block until a slot is available.
+
 #### VLM_SERVICE_PORT
 
 **Description**: The port number on which the FastAPI server will run.
@@ -427,6 +473,15 @@ export OV_CONFIG='{"PERFORMANCE_HINT": "LATENCY"}'
 ```bash
 export OV_CONFIG='{"PERFORMANCE_HINT": "THROUGHPUT", "NUM_STREAMS": 8}'
 export VLM_MAX_COMPLETION_TOKENS=500
+```
+
+**Concurrent Request Handling**:
+
+```bash
+# Enable continuous batching with a larger queue for high-concurrency scenarios
+export VLM_CONTINUOUS_BATCHING=true
+export VLM_SCHEDULER_MAX_QUEUE=128
+export OV_CONFIG='{"PERFORMANCE_HINT": "THROUGHPUT"}'
 ```
 
 ### Development vs Production

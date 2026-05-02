@@ -72,6 +72,14 @@ class Settings(BaseSettings):
         default=100,
         json_schema_extra={"env": "VLM_TELEMETRY_MAX_RECORDS"},
     )
+    VLM_CONTINUOUS_BATCHING: bool = Field(
+        default=True,
+        json_schema_extra={"env": "VLM_CONTINUOUS_BATCHING"},
+    )
+    VLM_SCHEDULER_MAX_QUEUE: int = Field(
+        default=64,
+        json_schema_extra={"env": "VLM_SCHEDULER_MAX_QUEUE"},
+    )
 
     @field_validator("VLM_LOG_LEVEL", mode="before")
     @classmethod

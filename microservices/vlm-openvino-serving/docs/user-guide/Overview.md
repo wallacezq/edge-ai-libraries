@@ -6,6 +6,13 @@ The VLM OpenVINO serving is a microservice that provides a FastAPI based OpenVIN
 
 The microservice is a simple model serving to be able to do inference using VLM models on a GPU or CPU hardware. It provides OpenAI standard chat completions API along with ability to deploy as a docker image or using Helm chart.
 
+### Key Features
+
+- **OpenAI-compatible API**: Standard `/v1/chat/completions` endpoint with streaming support
+- **Multi-modal inputs**: Image, multi-image, and video inference
+- **Continuous batching**: Built-in inference scheduler that handles concurrent requests without pipeline conflicts. Supports native `add_request()`/`step()` batching when available, with automatic serialized fallback for older runtimes.
+- **Multiple hardware targets**: CPU and GPU inference with configurable optimization
+
 ## Models supported
 
 | Model Name                           | Single Image Support | Multi-Image Support | Video Support | Hardware Support                            |

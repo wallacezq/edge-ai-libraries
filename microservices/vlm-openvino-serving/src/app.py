@@ -66,6 +66,7 @@ from src.utils.utils import (
 )
 from src.utils.telemetry import build_usage_and_telemetry
 from src.utils.telemetry_store import telemetry_store
+from src.utils.scheduler import InferenceScheduler, STREAM_DONE
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
@@ -111,6 +112,25 @@ def extract_response_text(result) -> str:
     if hasattr(result, "texts") and getattr(result, "texts"):
         return result.texts[0]
     return str(result)
+
+
+class _SchedulerQueueStreamer:
+    """Adapts the scheduler's token Queue into the iterator interface expected by
+    create_streaming_response.  Also exposes perf_metrics after iteration completes."""
+
+    def __init__(self, token_queue, sched_request):
+        self._queue = token_queue
+        self._sched_request = sched_request
+        self.perf_metrics = None
+
+    def __iter__(self):
+        while True:
+            chunk = self._queue.get()
+            if chunk is STREAM_DONE:
+                # Capture perf_metrics from the scheduler request
+                self.perf_metrics = getattr(self._sched_request, "perf_metrics", None)
+                break
+            yield chunk
 
 
 def summarize_message_for_log(message: Any) -> dict:
@@ -368,6 +388,7 @@ pipe: Optional[Any] = None
 processor: Any = None
 model_dir = None
 model_config = None
+inference_scheduler: Optional[InferenceScheduler] = None
 
 
 def cleanup_pipeline_state():
@@ -465,7 +486,7 @@ def initialize_model():
         RuntimeError: If there is an error during model initialization.
     """
     global model_ready
-    global pipe, processor, model_dir, model_config
+    global pipe, processor, model_dir, model_config, inference_scheduler
     model_name = settings.VLM_MODEL_NAME
     model_dir = Path(model_name.split("/")[-1])
     model_dir = Path("ov-model") / model_dir
@@ -525,6 +546,21 @@ def initialize_model():
                 processor = None  # No processor needed for this case
         model_ready = is_model_ready(model_dir)
         logger.debug("Model is ready")
+
+        # Initialize inference scheduler for continuous batching support
+        if settings.VLM_CONTINUOUS_BATCHING and ModelNames.SMOLVLM not in model_name.lower():
+            inference_scheduler = InferenceScheduler(
+                pipe, max_queue_size=settings.VLM_SCHEDULER_MAX_QUEUE
+            )
+            inference_scheduler.start()
+            logger.info(
+                "Inference scheduler started (continuous_batching=%s, max_queue=%d).",
+                inference_scheduler.use_continuous_batching,
+                settings.VLM_SCHEDULER_MAX_QUEUE,
+            )
+        else:
+            logger.info("Inference scheduler disabled for this model configuration.")
+
     except Exception as e:
         logger.error(f"Error initializing the model: {e}")
         raise RuntimeError(f"Error initializing the model: {e}")
@@ -819,11 +855,64 @@ async def chat_completions(request: ChatRequest):
         )
 
         async def respond_with_generation(generation_kwargs):
-            """Invoke the pipeline, handling streaming vs. non-stream flows consistently."""
+            """Invoke the pipeline, handling streaming vs. non-stream flows consistently.
+
+            When the inference scheduler is active, requests are submitted to the
+            scheduler queue which handles serialization or continuous batching.
+            Otherwise falls back to direct pipeline invocation.
+            """
             nonlocal cleanup_deferred
             logger.debug(
                 "Invoking pipeline with kwargs: %s", list(generation_kwargs.keys())
             )
+
+            # Use the inference scheduler if available
+            if inference_scheduler is not None:
+                if request.stream:
+                    token_queue, sched_req = await inference_scheduler.submit(
+                        generation_kwargs, stream=True
+                    )
+                    cleanup_deferred = True
+                    # Wrap the token_queue as a streamer-like iterator
+                    scheduler_streamer = _SchedulerQueueStreamer(token_queue, sched_req)
+                    return create_streaming_response(
+                        scheduler_streamer,
+                        request,
+                        settings.VLM_MODEL_NAME,
+                        on_complete=cleanup_pipeline_state,
+                        generation_thread=None,
+                        telemetry_callback=persist_telemetry,
+                    )
+
+                result = await inference_scheduler.submit(
+                    generation_kwargs, stream=False
+                )
+                response_text = extract_response_text(result)
+                usage, telemetry = build_usage_and_telemetry(
+                    getattr(result, "perf_metrics", None)
+                )
+                log_telemetry("non-stream", usage, telemetry)
+                response_payload = ChatCompletionResponse(
+                    id=str(uuid.uuid4()),
+                    object="chat.completion",
+                    created=int(time.time()),
+                    model=request.model,
+                    choices=[
+                        ChatCompletionChoice(
+                            index=0,
+                            message=ChatCompletionDelta(
+                                role="assistant", content=response_text
+                            ),
+                            finish_reason="stop",
+                        )
+                    ],
+                    usage=usage,
+                    telemetry=telemetry,
+                )
+                persist_telemetry("success", usage, telemetry, None)
+                return response_payload
+
+            # Fallback: direct pipeline invocation (no scheduler)
             if request.stream:
                 streamer, thread = launch_streaming_generation(pipe, generation_kwargs)
                 cleanup_deferred = True
