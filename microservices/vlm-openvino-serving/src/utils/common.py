@@ -179,7 +179,7 @@ class ModelNames:
     Contains constants for model names.
     """
 
-    QWEN = "qwen2"
+    QWEN = "qwen"
     PHI = "phi-3.5-vision"
     SMOLVLM = "smolvlm"
 

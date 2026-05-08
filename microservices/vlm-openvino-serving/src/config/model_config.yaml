@@ -15,6 +15,10 @@ qwen2-vl-2b-instruct:
   min_pixels: 256 * 28 * 28
   max_pixels: 256 * 28 * 28
 
+qwen3-vl-8b-instruct:
+  min_pixels: 128 * 28 * 28
+  max_pixels: 256 * 256 * 256
+
 phi-3.5-vision-instruct:
   min_pixels: null
   max_pixels: null
@@ -33,4 +37,5 @@ smolvlm2-2.2b-instruct:
 video_supported_models:
   - qwen/qwen2-vl-
   - qwen/qwen2.5-vl-
+  - qwen/qwen3-vl-
   - llava-hf/llava-next-video-

@@ -44,7 +44,7 @@ def test_all_error_messages():
 
 
 def test_model_names():
-    assert ModelNames.QWEN == "qwen2"
+    assert ModelNames.QWEN == "qwen"
 
 
 def test_all_model_names():
