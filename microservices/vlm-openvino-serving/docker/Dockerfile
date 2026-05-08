@@ -3,6 +3,8 @@
 
 FROM python:3.12.12-slim AS build
 
+RUN apt-get -y update && apt-get install --no-install-recommends -y git && rm -rf /var/lib/apt/lists/*
+
 RUN pip install --upgrade --no-cache-dir pip setuptools
 
 RUN pip install --no-cache-dir poetry
