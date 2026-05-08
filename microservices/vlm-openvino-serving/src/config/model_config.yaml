@@ -15,6 +15,15 @@ qwen2-vl-2b-instruct:
   min_pixels: 256 * 28 * 28
   max_pixels: 256 * 28 * 28
 
+
+qwen3-vl-4b-instruct:
+  min_pixels: 256 * 28 * 28
+  max_pixels: 256 * 28 * 28
+
+qwen3-vl-2b-instruct:
+  min_pixels: 256 * 28 * 28
+  max_pixels: 256 * 28 * 28
+    
 qwen3-vl-8b-instruct:
   min_pixels: 128 * 28 * 28
   max_pixels: 256 * 256 * 256
